@@ -38,12 +38,47 @@ class Noeud:
         self.enfants = {}
         self.profondeur_max = profondeur_max
         self.proba = None
+        self.hauteur = None
 
     def prediction(self, x):
-        pass
+        # Ici on regarde si on est sur une feuille on va retourner la proba
+        if self.proba is not None:
+            return self.proba
         
-    def grow(self, data):
-        pass
+        # Ici si on est pas sur une feuille on va regarder appliquer la question recurssivement 
+        if self.question is not None:
+            question_attribut, question_seuil = self.question
+            if x[question_attribut] <= question_seuil:
+                return self.enfants["enfant_1"].prediction(x)  
+            else:
+                return self.enfants["enfant_2"].prediction(x) 
+        
+    def grow(self, data, depth = 0):   
+        entropy = entropie(data)
+        question =best_split(data)
+        
+        if question is None:
+            self.hauteur = depth
+            self.proba = proba_empirique(data)
+            return
+      
+        d1, d2 = split(data, question)
+
+        if entropy > 0 and depth < self.profondeur_max and len(d1) > 0 and len(d2) > 0 :
+            self.question = question
+            self.enfants["enfant_1"] = Noeud(self.profondeur_max)
+            self.enfants["enfant_2"] = Noeud(self.profondeur_max)
+            
+            self.enfants["enfant_1"].hauteur = depth + 1
+            self.enfants["enfant_2"].hauteur = depth + 1    
+            
+            self.enfants["enfant_1"].grow(d1, depth+1)
+            self.enfants["enfant_2"].grow(d2, depth+1)
+        else:
+            self.hauteur = depth
+            self.proba = proba_empirique(data)
+    
+        
 
 # Calcul de la probabilité empirique
 def proba_empirique(d):
@@ -130,13 +165,27 @@ def gain_entropie(d, question):
     return entropie(d) - r1*entropie(d1) - r2*entropie(d2)
 
 def best_split(d):
+    best_question = None
     questions = liste_questions(d)
-    max_entropy_gain = 0
+    max_entropy_gain = -float('inf')
+    
     for question in questions:
         if max_entropy_gain < gain_entropie(d, question):
             max_entropy_gain = gain_entropie(d, question)
             best_question = question
-        
+  
     return best_question
+ 
+def precision(node, data):
+    count = 0
+    for d in data:
+        prediction = node.prediction(d.x)
+
+        class_predite = max(prediction.values())
+        
+        if d.y == class_predite:
+            count +=1
     
+    return count / len(data) *100 if data else 0 
+            
    
