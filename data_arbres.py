@@ -17,9 +17,6 @@ class DataPoint:
         return "x: " + str(self.x) + ", y: " + str(self.y)
 
 
-# point = DataPoint([1.2, 3.4, 5.6], 1, ["taille", "poids", "âge"])
-
-
 def load_data(filelocation):
     with open(filelocation, "r") as f:
         data = []
@@ -80,6 +77,58 @@ class Noeud:
             self.hauteur = depth
             self.proba = proba_empirique(data)
 
+    def calculate_node_cost(self, alpha, data=None):
+        if data is None:
+            if self.proba is not None:
+                return alpha
+            
+            return float('inf')
+        
+        # Calculate misclassification
+        misclassification = 0
+        for point in data:
+            prediction = self.prediction(point.x)
+            pred_value = max(prediction.values())
+            for key, value in prediction.items():
+                if pred_value == value:
+                    classe_predite = key
+                    break
+            
+            if point.y != classe_predite:
+                misclassification += 1
+        
+        # Cost is misclassification error plus complexity penalty
+        return misclassification + alpha
+
+    def elagage(self, alpha, data=None):
+        # If this is a leaf node, return its cost
+        if self.proba is not None:
+            return self.calculate_node_cost(alpha, data)
+        
+        # If not a leaf, first prune children
+        if "enfant_1" in self.enfants and "enfant_2" in self.enfants:
+            cost_1 = self.enfants["enfant_1"].elagage(alpha, data)
+            cost_2 = self.enfants["enfant_2"].elagage(alpha, data)
+        
+        # Calculate the cost of pruning this node (turning it into a leaf)
+        leaf_cost = self.calculate_node_cost(alpha, data)
+        
+        # Calculate the current subtree cost
+        if "enfant_1" in self.enfants and "enfant_2" in self.enfants:
+            subtree_cost = cost_1 + cost_2
+        else:
+            subtree_cost = float('inf')
+        
+        # Compare leaf cost with subtree cost
+        if leaf_cost <= subtree_cost:
+            # Prune the subtree by converting to a leaf
+            self.enfants.clear()  # Remove children
+            self.question = None  # Remove splitting question
+            self.proba = proba_empirique([])  # Set probability based on current data
+            return leaf_cost
+        
+        return subtree_cost
+
 
 # Calcul de la probabilité empirique
 def proba_empirique(d):
@@ -108,7 +157,6 @@ def split(d, question):
     d1 = []
     d2 = []
     for i in range(len(d)):
-
         if question_inf(d[i], a, s):
             d1.append(d[i])
         else:
